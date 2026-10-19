@@ -69,10 +69,11 @@ jobs:
 
       - name: Free disk and add swap
         if: steps.done.outputs.skip != 'true'
-        # The webpack build peaks around 9 GB with one page-data worker (see upstream Dockerfile).
+        # The webpack pass needs a 12 GB V8 heap (upstream's own :next build uses the same);
+        # the 16 GB runner gets 12 GB of extra swap on top of its default 4 GB.
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo fallocate -l 8G /mnt/swap-build && sudo chmod 600 /mnt/swap-build
+          sudo fallocate -l 12G /mnt/swap-build && sudo chmod 600 /mnt/swap-build
           sudo mkswap /mnt/swap-build && sudo swapon /mnt/swap-build
           free -h && df -h /
 
@@ -95,6 +96,7 @@ jobs:
           platforms: linux/amd64
           build-args: |
             OMNIROUTE_USE_TURBOPACK=0
+            OMNIROUTE_BUILD_MEMORY_MB=12288
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.up.outputs.sha }}
