@@ -3,7 +3,8 @@
 # Upstream's own :next image rarely publishes: every push to the release branch
 # cancels the previous build, so it lags the branch by days. This builds the
 # current head once a day with the same Dockerfile target and build args as
-# upstream's :next, smoke-tests it offline, and only then moves :edge.
+# upstream's :next, applies the patches in patches/, smoke-tests it offline, and
+# only then moves :edge.
 name: build
 
 on:
@@ -53,6 +54,19 @@ jobs:
           echo "short=${sha:0:12}" >> "$GITHUB_OUTPUT"
           echo "Upstream \`$branch\` at [\`${sha:0:12}\`](https://github.com/$UPSTREAM/commit/$sha)" >> "$GITHUB_STEP_SUMMARY"
 
+      - uses: actions/checkout@v4
+        with:
+          path: build-repo
+
+      - name: Patch set id
+        id: patches
+        # Part of the image tag, so a patch change rebuilds the same upstream commit.
+        run: |
+          id=$(cat build-repo/patches/*.patch | sha256sum | cut -c1-8)
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "tag=sha-${{ steps.up.outputs.short }}-p$id" >> "$GITHUB_OUTPUT"
+          echo "Patches: $(ls build-repo/patches | tr '\n' ' ')(set \`$id\`)" >> "$GITHUB_STEP_SUMMARY"
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -62,7 +76,7 @@ jobs:
       - name: Skip if this commit is already built
         id: done
         run: |
-          if [ "${{ inputs.force }}" != "true" ] && docker manifest inspect "$IMAGE:sha-${{ steps.up.outputs.short }}" >/dev/null 2>&1; then
+          if [ "${{ inputs.force }}" != "true" ] && docker manifest inspect "$IMAGE:${{ steps.patches.outputs.tag }}" >/dev/null 2>&1; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Already built; nothing to do." >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -83,6 +97,18 @@ jobs:
           repository: ${{ env.UPSTREAM }}
           ref: ${{ steps.up.outputs.sha }}
           fetch-depth: 1
+          path: upstream
+
+      - name: Apply patches
+        if: steps.done.outputs.skip != 'true'
+        # A patch that no longer applies fails the build, so :edge stays on the last patched image
+        # instead of silently shipping an unpatched one.
+        working-directory: upstream
+        run: |
+          for p in ../build-repo/patches/*.patch; do
+            echo "applying $(basename "$p")"
+            git apply --verbose "$p"
+          done
 
       - uses: docker/setup-buildx-action@v3
         if: steps.done.outputs.skip != 'true'
@@ -91,7 +117,7 @@ jobs:
         if: steps.done.outputs.skip != 'true'
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: upstream
           target: runner-base
           platforms: linux/amd64
           build-args: |
@@ -100,7 +126,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.up.outputs.sha }}
-            org.opencontainers.image.version=${{ steps.up.outputs.branch }}@${{ steps.up.outputs.short }}
+            org.opencontainers.image.version=${{ steps.up.outputs.branch }}@${{ steps.up.outputs.short }}+p${{ steps.patches.outputs.id }}
           load: true
           push: false
           tags: omniroute:candidate
@@ -127,8 +153,8 @@ jobs:
       - name: Push
         if: steps.done.outputs.skip != 'true'
         run: |
-          for t in edge "sha-${{ steps.up.outputs.short }}"; do
+          for t in edge "${{ steps.patches.outputs.tag }}"; do
             docker tag omniroute:candidate "$IMAGE:$t"
             docker push "$IMAGE:$t"
           done
-          echo "Pushed \`$IMAGE:edge\` and \`$IMAGE:sha-${{ steps.up.outputs.short }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed \`$IMAGE:edge\` and \`$IMAGE:${{ steps.patches.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"

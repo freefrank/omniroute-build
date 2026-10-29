@@ -1,0 +1,43 @@
+diff --git a/open-sse/services/claudeMidConversationSystem.ts b/open-sse/services/claudeMidConversationSystem.ts
+index 6ba3f02c..3c18e71c 100644
+--- a/open-sse/services/claudeMidConversationSystem.ts
++++ b/open-sse/services/claudeMidConversationSystem.ts
+@@ -11,14 +11,15 @@
+  * Keeping those turns in place is only valid on an upstream that accepts `role: "system"`
+  * inside `messages[]`, which Anthropic gates behind the `mid-conversation-system-2026-04-07`
+  * beta. Many Anthropic-shaped relays (GLM, Kimi, MiniMax endpoints) do not support it and
+- * answer such a body with 400, so the in-place shape is used only when BOTH hold:
+- *   1. the operator turned on `ANTHROPIC_COMPATIBLE_MID_CONVERSATION_SYSTEM` (default off),
+- *   2. the client itself negotiated the beta in its `anthropic-beta` header — the same signal
+- *      native `claude` relies on (shouldUseMidConversationSystem in executors/claudeIdentity.ts
+- *      adds the beta it then needs). OmniRoute never invents the beta; the client's token is
+- *      forwarded by applyClientAnthropicBeta (config/anthropicHeaders.ts) while such a turn is
+- *      still in the body.
+- * Anything else — flag off, beta absent, flag read failing — keeps the legacy full hoist.
++ * answer such a body with 400, so the in-place shape is used only when the operator turned on
++ * `ANTHROPIC_COMPATIBLE_MID_CONVERSATION_SYSTEM` (default off) for relays known to accept it.
++ *
++ * omniroute-build patch: upstream also required the client to send the beta in its own
++ * `anthropic-beta` header. Anthropic made mid-conversation system turns generally available and
++ * current Claude Code drops that token (even from ANTHROPIC_BETAS), so the requirement can no
++ * longer be met and the flag had no effect. The flag alone now decides. The client's token is
++ * still forwarded by applyClientAnthropicBeta (config/anthropicHeaders.ts) when it sends one.
++ * Anything else — flag off, flag read failing — keeps the legacy full hoist.
+  */
+ 
+ import { MID_CONVERSATION_SYSTEM_BETA } from "../config/anthropicHeaders.ts";
+@@ -56,7 +57,6 @@ export function resolveClaudeMidConversationSystemPolicy({
+   provider,
+   sourceFormat,
+   targetFormat,
+-  clientAnthropicBeta,
+   isPassthroughEnabled,
+ }: {
+   provider: string | null | undefined;
+@@ -68,6 +68,5 @@ export function resolveClaudeMidConversationSystemPolicy({
+   if (sourceFormat !== FORMATS.CLAUDE || targetFormat !== FORMATS.CLAUDE) return false;
+   if (typeof provider !== "string" || !provider.startsWith("anthropic-compatible-")) return false;
+   if (isClaudeCodeCompatibleProvider(provider)) return false;
+-  if (!clientNegotiatedMidConversationSystem(clientAnthropicBeta)) return false;
+   return readFlag(isPassthroughEnabled);
+ }
