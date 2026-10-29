@@ -9,7 +9,7 @@
 - `ghcr.io/freefrank/omniroute:edge`：最近一次通过检查的构建
 - `ghcr.io/freefrank/omniroute:sha-<12 位>-p<8 位>`：每个上游提交加补丁组合一个标签，用来固定版本或回滚
 
-同一个上游提交、同一组补丁已经构建过的会跳过。需要重建时手动运行工作流并勾选 `force`。
+同一个上游提交、同一组补丁已经构建过的会跳过。需要重建时手动运行工作流并勾选 `force`；填 `ref` 可以构建指定的上游提交（比如上游最新提交构建失败时，退回上一个能构建的提交）。
 
 镜像的 `org.opencontainers.image.revision` 标签记录了上游提交，`org.opencontainers.image.version` 末尾的 `+p<补丁组>` 记录了补丁。
 

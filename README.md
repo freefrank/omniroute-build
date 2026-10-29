@@ -9,7 +9,7 @@ Upstream's `:next` image rarely publishes because each push cancels the previous
 - `ghcr.io/freefrank/omniroute:edge`: the latest build that passed the smoke test
 - `ghcr.io/freefrank/omniroute:sha-<12 chars>-p<8 chars>`: one tag per upstream commit and patch set, for pinning or rollback
 
-A commit that already has an image with the current patch set is skipped. Run the workflow by hand with `force` to rebuild.
+A commit that already has an image with the current patch set is skipped. Run the workflow by hand with `force` to rebuild, and with `ref` to build a specific upstream commit (for example the last one that built when upstream's head is broken).
 
 The image carries `org.opencontainers.image.revision` with the upstream commit; `org.opencontainers.image.version` ends in `+p<patch set>`.
 
