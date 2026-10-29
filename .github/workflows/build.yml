@@ -17,6 +17,10 @@ on:
         description: Rebuild even if this upstream commit already has an image
         type: boolean
         default: false
+      ref:
+        description: Upstream commit, branch or tag to build instead of the default branch head
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -46,9 +50,10 @@ jobs:
         id: up
         env:
           GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.ref }}
         run: |
           branch=$(gh api "repos/$UPSTREAM" -q .default_branch)
-          sha=$(gh api "repos/$UPSTREAM/commits/$branch" -q .sha)
+          sha=$(gh api "repos/$UPSTREAM/commits/${REF:-$branch}" -q .sha)
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "short=${sha:0:12}" >> "$GITHUB_OUTPUT"
