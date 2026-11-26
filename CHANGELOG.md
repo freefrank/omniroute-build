@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-26
+
+- Drop `0001-mid-conversation-system-without-client-beta.patch`: upstream PR #18341 replaced the gate with the per-connection `keepMidConversationSystem` setting, and the patch no longer applied, so every daily build since 2026-11-05 failed.
+- An empty `patches/` builds again; the tag is then `sha-<commit>` and the version label has no `+p` suffix.
+
 ## 2026-10-29
 
 - `workflow_dispatch` input `ref` builds a given upstream commit instead of the default branch head.
